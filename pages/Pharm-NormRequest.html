@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+
+<head>
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+
+    <title>Stocker - Pharm-NormRequest</title>
+    <meta content="" name="description">
+    <meta content="" name="keywords">
+
+    <!-- Favicons -->
+    <link href="../assets/img/logo.png" rel="icon">
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.gstatic.com" rel="preconnect">
+    <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,300i,400,400i,600,600i,700,700i|Nunito:300,300i,400,400i,600,600i,700,700i|Poppins:300,300i,400,400i,500,500i,600,600i,700,700i" rel="stylesheet">
+
+    <!-- Vendor CSS Files -->
+    <link href="../assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="../assets/vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
+    <link href="../assets/vendor/boxicons/css/boxicons.min.css" rel="stylesheet">
+    <link href="../assets/vendor/quill/quill.snow.css" rel="stylesheet">
+    <link href="../assets/vendor/quill/quill.bubble.css" rel="stylesheet">
+    <link href="../assets/vendor/remixicon/remixicon.css" rel="stylesheet">
+    <link href="../assets/vendor/simple-datatables/style.css" rel="stylesheet">
+
+    <!-- Template Main CSS File -->
+    <link href="../assets/css/style.css" rel="stylesheet" />
+    <link href="../assets/css/ourStyle.css" rel="stylesheet" />
+
+
+    <!-- ajaxCalls and JQuery -->
+    <script src="../assets/js/ajaxCalls.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.1.min.js" integrity="sha256-o88AwQnZB+VDvE9tvIXrMQaPlFFSUTR+nldQm1LuPXQ=" crossorigin="anonymous"></script>
+    <script src="../assets/js/custom-dropdown-input.js"></script>
+    <script src="../assets/js/custom-dropdown-input-meds.js"></script>
+    <script src="../assets/js/global-functions.js"></script>
+    <script src="https://unpkg.com/sweetalert/dist/sweetalert.min.js"></script>
+
+    <!-- datatables -->
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.24/css/jquery.dataTables.min.css">
+    <script type="text/javascript" src="https://cdn.datatables.net/1.10.24/js/jquery.dataTables.min.js"></script>
+
+    <script>
+
+        let dataTable;
+        let norm;
+        let medsToUpdate = []; // Declare and initialize medsToUpdate array
+
+        $(document).ready(function () {
+
+            GetDepsApi = "https://proj.ruppin.ac.il/cgroup36/prod/api/Department";
+            apiGetDepNorm = "https://proj.ruppin.ac.il/cgroup36/prod/api/Norm/";
+            apiGetMeds = "https://proj.ruppin.ac.il/cgroup36/prod/GetActiveMeds";
+            apiPostNormReq = "https://proj.ruppin.ac.il/cgroup36/prod/api/NormRequest";
+
+            deps = []; // Array to save departments data
+            depNames = [];
+            GetDepartments();
+            createDropDownInput(depNames);
+
+            meds = []; // Array to save meds data
+            medNames = [];
+            GetMeds();
+
+            user = JSON.parse(sessionStorage.getItem("LoginUser")); //get user from storage
+            renderUser(user);
+
+            $("#DepSearch").submit(GetDepNorm); //form validation
+
+        })
+
+        function lastUpdateRender(norm) {
+            let LastUpdateStr;
+            if (norm.length !== 0) {
+                var time = norm.lastUpdate.slice(11, 16);
+                var date = norm.lastUpdate.slice(0, 10);
+                LastUpdateStr = `<p class="orderDate"> ${date} ${time}</p>`
+            }
+            else {
+                LastUpdateStr = "";
+            }
+            document.getElementById("LastUpdate_ph").innerHTML = LastUpdateStr;
+
+        }
+
+        function GetMeds() {
+            ajaxCall("GET", apiGetMeds, "", GetMedsSCB, GetMedsECB);
+        }
+
+        function GetMedsSCB(data) {
+            console.log(data);
+
+            for (var i = 0; i < data.length; i++) {
+                var medId = data[i]['medId'];
+                var medName = data[i]['medName'];
+
+                medNames.push({ "medId": medId, "medName": medName }); // Save med ID as key and med name as value in the array
+            }
+            console.log(medNames);
+        }
+
+        function GetMedsECB(err) {
+            console.log(err);
+            sweetalert("שגיאה בשרת", "", true, false, "");
+        }
+
+        function GetDepartments() {
+            ajaxCall("GET", GetDepsApi, "", GetDepsSCB, GetDepsECB);
+            return false;
+        }
+
+        function GetDepsSCB(data) {
+            console.log(data);
+
+            for (var i = 0; i < data.length; i++) {
+                deps.push({ depId: data[i]['depId'], depName: data[i]['depName'] }); // Save department ID and name in the array
+                if (!depNames.includes(data[i]['depName']) && data[i]['depType'] != "מערכות מידע" && data[i]['depType'] != "בית מרקחת" && data[i]['depName'] != "")
+                    depNames.push(data[i]['depName']);
+            }
+            renderOptions(depNames);
+        }
+
+        function GetDepsECB(err) {
+            console.log(err);
+            sweetalert("שגיאה בשרת", "", true, false, "");
+        }
+
+        function GetDepNorm() {
+            DepName = $("#input").val();
+
+            Dep = deps.find(function (dep) {
+                return dep.depName === DepName;
+            });
+
+            ajaxCall("GET", apiGetDepNorm + "depId/" + Dep.depId, "", GetNormSCB, GetNormECB);
+            return false;
+        }
+
+        function GetNormSCB(data) {
+            console.log(data);
+            DataTableRender(data);
+        }
+
+        function GetNormECB(err) {
+            console.log(err);
+            sweetalert("שגיאה בשרת", "", true, false, "");
+        }
+
+        function DataTableRender(normData) {
+            let medsNormArray = [];
+            if (normData.length === 0) {
+                norm = [];
+                medsToUpdate = JSON.parse(JSON.stringify(medsNormArray));
+            }
+            else {
+                norm = normData[0];
+                for (var i = 0; i < norm.medList.length; i++) {
+                    medsNormArray.push(norm.medList[i]);
+                }
+                //independent copy the medsNormArray to medsToUpdate array to display changes
+                medsToUpdate = JSON.parse(JSON.stringify(medsNormArray));
+            }
+
+            console.log("norm", norm);
+            console.log("medsNormArray", medsNormArray);
+            console.log("medsToUpdate:", medsToUpdate);
+
+            try {
+                if (!dataTable) {
+                    // Add an empty row of inputs at the top of the data table
+                    medsToUpdate.unshift({ medId: "", normQty: "", mazNum: "", medName: "", reqQty: "" });
+
+                    dataTable = $('#Table').DataTable({
+                        "language": {
+                            "url": "//cdn.datatables.net/plug-ins/9dcbecd42ad/i18n/Hebrew.json"
+                        },
+                        data: medsToUpdate,
+                        pageLength: 5,
+                        columns: [
+                            {
+                                data: null,
+                                render: function (data, type, row, meta) {
+                                    if (row.medName === "") {
+                                        return '<i id="add-icon" class="bi bi-plus-lg add-icon"></i>';
+                                    } else {
+                                        return '<i class="bi bi-trash delete-icon"></i>';
+                                    }
+                                },
+                                createdCell: function (cell, cellData, rowData, rowIndex, colIndex) {
+                                    $(cell).on('click', '.delete-icon', function () {
+                                        //Get the index of the medication to delete
+                                        var index = dataTable.row($(this).closest('tr')).index();
+                                        //Array for presentation to a dataTable
+                                        medsToUpdateTemp = medsToUpdate.filter(function (med) {
+                                            return med.reqQty !== 0;
+                                        });
+                                        //"Remove" the medication from the array by giving reqQty a value of 0
+                                        for (let i = 0; i < medsToUpdate.length; i++) {
+                                            if (medsToUpdateTemp[index].medId === medsToUpdate[i].medId) {
+                                                medsToUpdate[i].reqQty = 0;
+                                            }
+                                        }
+                                        //Updating the array for presentation to a dataTable
+                                        medsToUpdateTemp = medsToUpdate.filter(function (med) {
+                                            return med.reqQty !== 0;
+                                        });
+                                        //Add reqQty
+                                        for (let i = 0; i < medsToUpdate.length; i++) {
+                                            if (medsToUpdate[i].reqQty === undefined) {
+                                                medsToUpdate[i].reqQty = medsToUpdate[i].normQty;
+                                            }
+                                        }
+                                        //if updated render update button
+                                        if (!areArraysIdentical(medsToUpdate, medsNormArray)) {
+                                            renderUpdateButton(true);
+                                        } else {
+                                            renderUpdateButton(false);
+                                        }
+                                        //Clear the existing data from the table
+                                        dataTable.clear().draw();
+                                        //Add the updated medsToUpdate data to the table
+                                        dataTable.rows.add(medsToUpdateTemp).draw();
+                                        //Call checkTableRendered to check if the table is fully rendered
+                                        checkTableRendered();
+                                    });
+
+                                    $(cell).on('click', '#add-icon', function () {
+                                        //Get the input values from the first row
+                                        var medInputValue = $('#medInput').val();
+                                        var normQtyInputValue = parseInt($('#normQty-input').val(), 10);
+                                        var chosenMedId = $("#meds-dropdown-options li[data-value='" + medInputValue + "']").attr("id");
+                                        var doesNotIncludeMedName = true;
+                                        //Checking whether the array medsToUpdateTemp exists
+                                        if (typeof medsToUpdateTemp !== "undefined") {
+                                            //The medicine is present in the array medsToUpdateTemp
+                                            for (var i = 0; i < medsToUpdateTemp.length; i++) {
+                                                if (medsToUpdateTemp[i].medName === medInputValue) {
+                                                    doesNotIncludeMedName = false;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                        else {
+                                            //The medicine is present in the array medsToUpdate
+                                            for (var i = 0; i < medsToUpdate.length; i++) {
+                                                if (medsToUpdate[i].medName === medInputValue) {
+                                                    doesNotIncludeMedName = false;
+                                                    break;
+                                                }
+                                            }
+                                        }
+
+                                        //Remove any previous invalid class from medInput
+                                        $('#medInput').removeClass('is-invalid');
+                                        //Remove any previous invalid class from normQty-input
+                                        $('#normQty-input').removeClass('is-invalid');
+
+                                        //Validate the input values
+                                        if (medInputValue.trim() === '' && isNaN(normQtyInputValue)) {
+                                            $('#medInputValidation').text("יש למלא את כל השדות");
+                                            //Add the invalid class to medInput
+                                            $('#medInput').addClass('is-invalid');
+                                            //Add the invalid class to normQty-input
+                                            $('#normQty-input').addClass('is-invalid');
+                                            return;
+                                        }
+                                        else if (medInputValue.trim() === '') {
+                                            $('#medInputValidation').text("יש למלא את כל השדות");
+                                            //Add the invalid class to medInput
+                                            $('#medInput').addClass('is-invalid');
+                                            return;
+                                        }
+                                        else if (isNaN(normQtyInputValue)) {
+                                            $('#medInputValidation').text("יש למלא את כל השדות");
+                                            //Add the invalid class to normQty-input
+                                            $('#normQty-input').addClass('is-invalid');
+                                            return;
+                                        }
+                                        else if (!medNames.some(function (item) {
+                                            return item.medName === medInputValue;
+                                        })) {
+                                            $('#medInputValidation').text("אנא בחר תרופה מהרשימה");
+                                            //Add the invalid class to medInput
+                                            $('#medInput').addClass('is-invalid');
+                                            return;
+                                        }
+                                        else if (!doesNotIncludeMedName) {
+                                            $('#medInputValidation').text("תרופה זו כבר קיימת בתקן");
+                                            // Add the invalid class to normQty-input
+                                            $('#medInput').addClass('is-invalid');
+                                            return;
+                                        }
+
+                                        var doesNotIncludeMedName = true;
+                                        for (var i = 0; i < medsToUpdate.length; i++) {
+                                            if (medsToUpdate[i].medName === medInputValue) {
+                                                doesNotIncludeMedName = false;
+                                                medsToUpdate[i].reqQty = normQtyInputValue;
+                                                //Deep copy the object to avoid modifying the original array
+                                                medsToUpdateTemp.push(JSON.parse(JSON.stringify(medsToUpdate[i])));
+                                                for (var j = 0; j < medsToUpdateTemp.length; j++) {
+                                                    if (medsToUpdateTemp[j].medName === medInputValue) {
+                                                        medsToUpdateTemp[j].normQty = normQtyInputValue;
+                                                    }
+                                                }
+                                                break;
+                                            }
+                                        }
+
+
+                                        if (doesNotIncludeMedName) {
+                                            // reate a new data object with the input values
+                                            var newMedData = {
+                                                medId: parseInt(chosenMedId),
+                                                normQty: normQtyInputValue,
+                                                mazNum: '',
+                                                medName: medInputValue,
+                                                predQty: 0,
+                                                reqQty: normQtyInputValue
+                                            };
+
+                                            //Add the new data object to the medsToUpdate
+                                            medsToUpdate.push(newMedData);
+                                            //If array medsToUpdate exists, add the new data object (newMedData) to the medsToUpdateTemp array as well
+                                            if (typeof medsToUpdateTemp !== "undefined") {
+                                                medsToUpdateTemp.push(newMedData);
+                                            }
+                                        }
+
+                                        //Loop through all the other rows in the medsToUpdate array
+                                        for (var i = 0; i < medsToUpdate.length; i++) {
+                                            if (i !== rowIndex && medsToUpdate[i].reqQty === undefined) {
+                                                medsToUpdate[i].reqQty = medsToUpdate[i].normQty;
+                                            }
+                                        }
+                                        console.log("medsNormArray", medsNormArray);
+                                        console.log("medsToUpdate", medsToUpdate);
+                                        //console.log("medsToUpdateTemp", medsToUpdateTemp);
+                                        //if updated render update button
+                                        if (!areArraysIdentical(medsToUpdate, medsNormArray)) {
+                                            renderUpdateButton(true);
+                                        } else {
+                                            renderUpdateButton(false);
+                                        }
+                                        //Clear the existing data from the table
+                                        dataTable.clear().draw();
+                                        //Add the updated medsToUpdate data to the table
+                                        if (typeof medsToUpdateTemp !== "undefined") {
+                                            dataTable.rows.add(medsToUpdateTemp).draw();
+                                        }
+                                        else { dataTable.rows.add(medsToUpdate).draw(); }
+                                        // Call checkTableRendered to check if the table is fully rendered
+                                        checkTableRendered();
+                                    });
+                                }
+                            },
+                            {
+                                data: "medName",
+                                render: function (data, type, row, meta) {
+                                    if (type === 'display' && row.medName === "") {
+                                        let str = '<input type="text" id="medInput" class="medName-input form-control" autocomplete="off" required>';
+                                        str += '<ul class="dropdown-options" id="meds-dropdown-options"></ul>';
+                                        str += '<div id="medInputValidation"></div>'
+                                        return str;
+                                    }
+                                    else {
+                                        return data;
+                                    }
+                                }
+                            },
+                            {
+                                data: "normQty",
+                                render: function (data, type, row, meta) {
+                                    if (type === 'display' && row.normQty === "") {
+                                        return '<input type="number" id="normQty-input" class="form-control" min="0">';
+                                    }
+                                    else {
+                                        return '<input type="number" class="normQty-input form-control" min="0" value="' + data + '">';
+                                    }
+                                }
+                            }
+                        ],
+                    });
+
+                    //Show the table header
+                    $('#Table thead').show();
+
+                    //Update the normQty value of the med in the sToUpdate when the input value is changed
+                    $('#Table').on('change', '.normQty-input', function () {
+                        var newValue = parseInt($(this).val(), 10);
+                        //Find the index of the row containing the changed input field in the DataTable
+                        var rowIndex = dataTable.row($(this).closest('tr')).index();
+                        if (medsToUpdate[rowIndex].reqQty === undefined) {
+                            var med = medsToUpdate[rowIndex];
+                            //Update the value in the medsToUpdate array
+                            med.reqQty = newValue;
+                        }
+                        else {
+                            var med = medsToUpdateTemp[rowIndex];
+                             //Update the value in the medsToUpdateTemp array
+                            med.reqQty = newValue;
+                            //Update the 'reqQty' property for the corresponding medicine in the original medsToUpdate array
+                            for (var i = 0; i < medsToUpdate.length; i++) {
+                                if (medsToUpdate[i].medId === med.medId) {
+                                    medsToUpdate[i].reqQty = newValue;
+                                    break;
+                                }
+                            }
+                        }
+
+                        //Loop through all the other rows in the medsToUpdate array
+                        for (var i = 0; i < medsToUpdate.length; i++) {
+                            if (i !== rowIndex && medsToUpdate[i].reqQty === undefined) {
+                                medsToUpdate[i].reqQty = medsToUpdate[i].normQty;
+                            }
+                        }
+
+                        if (!areArraysIdentical(medsToUpdate, medsNormArray)) {
+                            renderUpdateButton(true);
+                        } else {
+                            renderUpdateButton(false);
+                        }
+                    });
+                }
+                else {
+                    // Clear the existing data from the table
+                    dataTable.clear().draw();
+                    // Add an empty row of inputs at the top of the data table
+                    medsToUpdate.unshift({ medId: "", normQty: "", mazNum: "", medName: "", reqQty: "" });
+                    // Add new data to the table
+                    dataTable.rows.add(medsToUpdate).draw();
+                }
+                // Call checkTableRendered to check if the table is fully rendered
+                checkTableRendered();
+            }
+            catch (err) {
+                console.log(err);
+                sweetalert("שגיאה בשרת", "", true, false, "");
+            }
+        }
+
+        function checkTableRendered() {
+            if ($('#Table tbody tr').length > 0) {
+                // Data table is rendered and visible
+                lastUpdateRender(norm);
+                createDropDownMedsInput(medNames);
+                renderMedsOptions(medNames);
+            } else {
+                // Data table is not yet rendered, wait for a short delay and check again
+                setTimeout(checkTableRendered, 100);
+            }
+        }
+
+        function renderUpdateButton(doRender) {
+            let str = "";
+            if (doRender) {
+                str += `<button type="button" class="btn btn-success" onclick="PostNormRequest()">שליחה</button>`;
+            } else {
+                str += ``;
+            }
+            document.getElementById("button_ph").innerHTML = str;
+        }
+
+        function PostNormRequest() {
+            const slicedMedsToUpdate = medsToUpdate.slice(1);//remove empty row data from array
+            const date = new Date;
+
+            const NewNormReq = {
+                reqId: 0,
+                normId: norm.normId,
+                reqDate: date,
+                userId: user.userId,
+                reqStatus: "",
+                depId: 0,
+                depName: "",
+                fullName: "",
+                position: "",
+                medReqList: slicedMedsToUpdate
+            }
+
+            ajaxCall("POST", apiPostNormReq, JSON.stringify(NewNormReq), PostNormRequestSCB, PostNormRequestECB);
+
+            return false;
+        }
+
+        function PostNormRequestSCB(data) {
+            sweetalert("הבקשה נשלחה בהצלחה", "", false, false, '');
+            renderUpdateButton(false);
+        }
+
+        function PostNormRequestECB(err) {
+            console.log(err);
+            sweetalert("שגיאה בשרת", "", true, false, "");
+        }
+
+    </script>
+
+    <style>
+        /* Hide the table headers */
+        .hide-table-header thead {
+            display: none;
+        }
+    </style>
+
+</head>
+
+<body>
+
+    <!-- ======= Header ======= -->
+    <header id="header" class="header fixed-top d-flex align-items-center">
+
+        <div class="d-flex align-items-center justify-content-between">
+            <a href="Pharm-PullOrders.html" class="logo d-flex align-items-center">
+                <span class="d-none d-xl-block">St<img class="header-logo" src="../assets/img/logo.png" alt="">cker</span>
+            </a>
+            <i class="bi bi-list toggle-sidebar-btn"></i>
+        </div>
+
+        <nav class="profil-nav header-nav ms-auto">
+            <ul class="d-flex align-items-center">
+                <li class="nav-item dropdown">
+                    <a class="nav-link nav-icon" href="Pharm-messages.html">
+                        <i class="bi bi-bell"></i>
+                    </a><!-- End Notification Icon -->
+                </li><!-- End Notification Nav -->
+
+                <li class="nav-item dropdown pe-3">
+                    <a class="nav-link nav-profile d-flex align-items-center pe-0" href="#" data-bs-toggle="dropdown" id="user_ph2">
+                        <span class="d-none d-md-block dropdown-toggle ps-2"></span>
+                    </a><!-- End Profile Iamge Icon -->
+
+                    <ul class="dropdown-menu dropdown-menu-end dropdown-menu profile">
+                        <li class="dropdown-header" id="user_ph1">
+                        </li>
+                        <li>
+                            <hr class="dropdown-divider">
+                        </li>
+                        <li>
+                            <a class="dropdown-item d-flex align-items-center" onclick="clearStorage()" href="Login.html">
+                                <i id="logoutIcon" class="bi bi-box-arrow-right"></i>
+                                <span>התנתק</span>
+                            </a>
+                        </li>
+                    </ul><!-- End Profile Dropdown Items -->
+                </li><!-- End Profile Nav -->
+
+            </ul>
+        </nav><!-- End Icons Navigation -->
+    </header><!-- End Header -->
+    <!-- ======= Sidebar ======= -->
+    <aside id="sidebar" class="sidebar">
+        <ul class="sidebar-nav" id="sidebar-nav">
+            <li class="nav-item">
+                <a class="nav-link collapsed" href="Pharm-PullOrders.html">
+                    <span>הזמנות משיכה</span>
+                </a>
+            </li><!-- End PullOrders Nav -->
+            <li class="nav-item">
+                <a class="nav-link collapsed" href="Pharm-PushOrders.html">
+                    <span>הזמנות דחיפה</span>
+                </a>
+            </li><!-- End PushOrders Nav -->
+            <li class="nav-item">
+                <a class="nav-link collapsed" href="Pharm-DepsInventory.html">
+                    <span>מחסן המחלקות</span>
+                </a>
+            </li><!-- End DepsStock Nav -->
+            <li class="nav-item">
+                <a class="nav-link active" data-bs-target="#norms-nav" data-bs-toggle="collapse" href="#" onclick="reload()">
+                    <span>תקני המחלקות</span><i class="bi bi-chevron-down ms-auto"></i>
+                </a>
+                <ul id="norms-nav" class="nav-content collapse show" data-bs-parent="#sidebar-nav">
+                    <li>
+                        <a href="Pharm-DepsNorms.html" onclick="reload()">
+                            <i class="bi bi-circle"></i><span>תקנים</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="Pharm-NormRequest.html" class="active" onclick="reload()">
+                            <i class="bi bi-circle"></i><span>בקשה לעדכון תקן</span>
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <!-- End DepsNorm Nav -->
+        </ul>
+    </aside><!-- End Sidebar-->
+
+    <main id="main" class="main">
+        <div class="row">
+            <div class="col-10 pagetitle"><h1>בקשה לשינוי תקן</h1></div>
+            <div id="LastUpdate_ph" class="col-2"></div>
+        </div><!-- End Page Title -->
+        <div class="card">
+            <div class="card-body">
+                <form id="DepSearch">
+                    <div class="row">
+                        <div class="col-md-12">
+                            <label class="col-form-label">בחר מחלקה</label>
+                        </div>
+                    </div>
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <div class="input-group has-validation">
+                                <div class="not-preceded-by-td">
+                                    <input type="text" id="input" class="form-control" autocomplete="off" required>
+                                    <ul class="dropdown-options" id="dropdown-options"></ul>
+                                    <div class="invalid-feedback">אנא בחר את סוג המחלקה מתוך הרשימה</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-8">
+                            <button type="submit" class="btn btn-primary">הצג</button>
+                        </div>
+                    </div>
+                </form>
+                <!-- Table with stripped rows table-striped-->
+                <div class="table-responsive">
+                    <table class="table hover table-striped-custom hide-table-header" id="Table" style="width:100%">
+                        <thead>
+                            <tr>
+                                <th></th>
+                                <th>שם התרופה</th>
+                                <th>כמות בתקן</th>
+                            </tr>
+                        </thead>
+                    </table>
+                </div>
+                <!-- End Table with stripped rows -->
+                <div id="button_ph" class="d-flex justify-content-center"></div>
+            </div>
+        </div>
+    </main><!-- End #main -->
+    <!-- ======= Footer ======= -->
+    <footer id="footer" class="footer">
+        <div class="copyright">
+            &copy; Copyright <strong><span>LML</span></strong>. All Rights Reserved
+        </div>
+    </footer><!-- End Footer -->
+
+    <a href="#" class="back-to-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
+
+    <!-- Vendor JS Files -->
+    <script src="../assets/vendor/apexcharts/apexcharts.min.js"></script>
+    <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="../assets/vendor/chart.js/chart.umd.js"></script>
+    <script src="../assets/vendor/echarts/echarts.min.js"></script>
+    <script src="../assets/vendor/quill/quill.min.js"></script>
+    <script src="../assets/vendor/simple-datatables/simple-datatables.js"></script>
+    <script src="../assets/vendor/tinymce/tinymce.min.js"></script>
+    <script src="../assets/vendor/php-email-form/validate.js"></script>
+
+    <!-- Template Main JS File -->
+    <script src="../assets/js/main.js"></script>
+
+</body>
+
+</html>

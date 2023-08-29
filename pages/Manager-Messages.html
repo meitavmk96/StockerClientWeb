@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+
+<head>
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+
+    <title>Stocker - messages</title>
+    <meta content="" name="description">
+    <meta content="" name="keywords">
+
+    <!-- Favicons -->
+    <link href="../assets/img/logo.png" rel="icon">
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.gstatic.com" rel="preconnect">
+    <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,300i,400,400i,600,600i,700,700i|Nunito:300,300i,400,400i,600,600i,700,700i|Poppins:300,300i,400,400i,500,500i,600,600i,700,700i" rel="stylesheet">
+
+    <!-- Vendor CSS Files -->
+    <link href="../assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="../assets/vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
+    <link href="../assets/vendor/boxicons/css/boxicons.min.css" rel="stylesheet">
+    <link href="../assets/vendor/quill/quill.snow.css" rel="stylesheet">
+    <link href="../assets/vendor/quill/quill.bubble.css" rel="stylesheet">
+    <link href="../assets/vendor/remixicon/remixicon.css" rel="stylesheet">
+    <link href="../assets/vendor/simple-datatables/style.css" rel="stylesheet">
+
+    <!-- Template Main CSS File -->
+    <link href="../assets/css/style.css" rel="stylesheet" />
+    <link href="../assets/css/ourStyle.css" rel="stylesheet" />
+
+    <!-- ajaxCalls and JQuery -->
+    <script src="../assets/js/ajaxCalls.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.1.min.js" integrity="sha256-o88AwQnZB+VDvE9tvIXrMQaPlFFSUTR+nldQm1LuPXQ=" crossorigin="anonymous"></script>
+    <script src="../assets/js/global-functions.js"></script>
+    <script src="https://unpkg.com/sweetalert/dist/sweetalert.min.js"></script>
+
+    <script>
+
+        $(document).ready(function () {
+
+            apiGetMessages = "https://proj.ruppin.ac.il/cgroup36/prod/api/Message";
+            apiPostMessage = "https://proj.ruppin.ac.il/cgroup36/prod/api/Message";
+
+            const textarea = document.getElementById("textarea");
+            const charCount = document.getElementById("charCount");
+
+            textarea.addEventListener("input", function () {
+                const maxLength = parseInt(textarea.getAttribute("maxlength"));
+                const currentLength = textarea.value.length;
+
+                charCount.textContent = `${currentLength}/${maxLength}`;
+
+                if (currentLength >= maxLength) {
+                    charCount.classList.add("text-danger");
+                } else {
+                    charCount.classList.remove("text-danger");
+                }
+            });
+
+            // Reset the value of the textarea whan modal is closed
+            $('#verticalycentered').on('hidden.bs.modal', function () {
+                $('#textarea').val('');
+                const charCount = document.getElementById('charCount');
+                charCount.textContent = '0/100'; // Reset the character count
+                charCount.classList.remove('text-danger'); // Remove the text-danger class if applied
+                $('#textarea').removeClass('is-valid is-invalid'); // Remove the is-valid and is-invalid classes from the textarea
+                $('#msgForm').removeClass('was-validated'); // Remove the was-validated class from the form
+            });
+
+            user = JSON.parse(sessionStorage.getItem("LoginUser")); //get user from storage
+            renderUser(user);
+
+            GetMessages();
+            MessagesList = [];
+
+            $("#msgForm").submit(PostMsg); //form validation
+        })
+
+        function GetMessages() {
+            ajaxCall("GET", apiGetMessages, "", getMessagesSCB, getMessagesECB);
+        }
+
+        function getMessagesSCB(data) {
+            console.log(data);
+            MessagesList = data;
+            MessagesRender(data);
+        }
+
+        function getMessagesECB(err) {
+            console.log(err);
+            sweetalert("שגיאה בשרת", "", true, false, "");
+        }
+
+        function MessagesRender(Messages) {
+            let str = "";
+            for (var i = 0; i < Messages.length; i++) {
+                str += `<div class="row msg">`;
+                str += `<div class="row msgHeader"><h6 class="col-9 msgTitle"> ${Messages[i].msg}</h6>`
+                str += `<p class="col-3 date">${Messages[i].msgDate.slice(0, 10)} ${Messages[i].msgDate.slice(11, 16)}</p></div>`;
+                str += `<div class="row"><p class="col">נוצר על ידי: ${Messages[i].pharmacistName}</p></div>`;
+                str += `</div>`;
+                if (i !== Messages.length - 1) {
+                    str += `<hr/>`;
+                }
+            }
+            document.getElementById("messages_ph").innerHTML = str;
+        }
+
+        function PostMsg() {
+
+            const msgId = 0;
+            const msgTxt = $("#textarea").val();
+            const userId = user.userId;
+            const msgDate = new Date();
+
+            if (msgTxt == "") {
+                return;
+            }
+            else {
+                const msg = {
+                    MsgId: msgId,
+                    Msg: msgTxt,
+                    UserId: userId,
+                    MsgDate: msgDate
+                };
+
+                ajaxCall("POST", apiPostMessage, JSON.stringify(msg), PostMsgSCB, PostMsgECB);
+
+                return false;
+            }
+        }
+
+        function PostMsgSCB(data) {
+            console.log(data);
+            GetMessages();
+            $('#verticalycentered').modal('hide');
+        }
+
+        function PostMsgECB(err) {
+            console.log(err);
+            sweetalert("שגיאה בשרת", "", true, false, "");
+        }
+
+    </script>
+
+</head>
+
+<body>
+
+    <!-- ======= Header ======= -->
+    <header id="header" class="header fixed-top d-flex align-items-center">
+
+        <div class="d-flex align-items-center justify-content-between">
+            <a href="Manager-Dashboard.html" class="logo d-flex align-items-center">
+                <span class="d-none d-xl-block">St<img class="header-logo" src="../assets/img/logo.png" alt="">cker</span>
+            </a>
+            <i class="bi bi-list toggle-sidebar-btn"></i>
+        </div>
+
+        <nav class="profil-nav header-nav ms-auto">
+            <ul class="d-flex align-items-center">
+                <li class="nav-item dropdown">
+                    <a class="nav-link nav-icon" href="Pharm-messages.html" data-bs-toggle="dropdown">
+                        <i class="bi bi-bell-fill"></i>
+                    </a><!-- End Notification Icon -->
+                </li><!-- End Notification Nav -->
+
+                <li class="nav-item dropdown pe-3">
+                    <a class="nav-link nav-profile d-flex align-items-center pe-0" href="#" data-bs-toggle="dropdown" id="user_ph2">
+                        <span class="d-none d-md-block dropdown-toggle ps-2"></span>
+                    </a><!-- End Profile Iamge Icon -->
+
+                    <ul class="dropdown-menu dropdown-menu-end dropdown-menu profile">
+                        <li class="dropdown-header" id="user_ph1">
+                        </li>
+                        <li>
+                            <hr class="dropdown-divider">
+                        </li>
+                        <li>
+                            <a class="dropdown-item d-flex align-items-center" onclick="clearStorage()" href="Login.html">
+                                <i id="logoutIcon" class="bi bi-box-arrow-right"></i>
+                                <span>התנתק</span>
+                            </a>
+                        </li>
+                    </ul><!-- End Profile Dropdown Items -->
+                </li><!-- End Profile Nav -->
+
+            </ul>
+        </nav><!-- End Icons Navigation -->
+    </header><!-- End Header -->
+    <!-- ======= Sidebar ======= -->
+    <aside id="sidebar" class="sidebar">
+        <ul class="sidebar-nav" id="sidebar-nav">
+            <li class="nav-item">
+                <a class="nav-link collapsed" href="Manager-Dashboard.html">
+                    <span>בית</span>
+                </a>
+            </li>
+            <!-- End Home Nav -->
+            <li class="nav-item">
+                <a class="nav-link collapsed" data-bs-target="#orders-nav" data-bs-toggle="collapse" href="#" onclick="reload()">
+                    <span>הזמנות</span><i class="bi bi-chevron-down ms-auto"></i>
+                </a>
+                <ul id="orders-nav" class="nav-content collapse" data-bs-parent="#sidebar-nav">
+                    <li>
+                        <a href="Manager-PullOrders.html" onclick="reload()">
+                            <i class="bi bi-circle"></i><span>הזמנות משיכה</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="Manager-PushOrders.html" onclick="reload()">
+                            <i class="bi bi-circle"></i><span>הזמנות דחיפה</span>
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <!-- End Orders Nav -->
+            <li class="nav-item">
+                <a class="nav-link collapsed" data-bs-target="#departments-nav" data-bs-toggle="collapse" href="#" onclick="reload()">
+                    <span>מחלקות</span><i class="bi bi-chevron-down ms-auto"></i>
+                </a>
+                <ul id="departments-nav" class="nav-content collapse" data-bs-parent="#sidebar-nav">
+                    <li>
+                        <a href="Manager-DepsInventory.html" onclick="reload()">
+                            <i class="bi bi-circle"></i><span>מחסן המחלקות</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="Manager-DepsUsage.html" onclick="reload()">
+                            <i class="bi bi-circle"></i><span>צריכת המחלקות</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="Manager-DepsTransfers.html" onclick="reload()">
+                            <i class="bi bi-circle"></i><span>העברות בין מחלקות</span>
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <!-- End Deps Nav -->
+            <li class="nav-item">
+                <a class="nav-link collapsed" data-bs-target="#norms-nav" data-bs-toggle="collapse" href="#" onclick="reload()">
+                    <span>תקנים</span><i class="bi bi-chevron-down ms-auto"></i>
+                </a>
+                <ul id="norms-nav" class="nav-content collapse" data-bs-parent="#sidebar-nav">
+                    <li>
+                        <a href="Manager-DepsNorms.html" onclick="reload()">
+                            <i class="bi bi-circle"></i><span>תקן המחלקות</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="Manager-NormRequests.html" onclick="reload()">
+                            <i class="bi bi-circle"></i><span>בקשות לעדכון תקן</span>
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <!-- End Norms Nav -->
+        </ul>
+    </aside><!-- End Sidebar-->
+
+    <main id="main" class="main">
+        <div class="pagetitle">
+            <h1>הודעות</h1>
+            <button id="addMsgBtn" type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#verticalycentered">שליחת הודעה</button>
+        </div><!-- End Page Title -->
+        <div class="card">
+            <div class="card-body">
+                <div id="messages_ph"></div>
+                <!-- Vertically centered Modal -->
+                <div class="modal fade" id="verticalycentered" tabindex="-1">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">יצירת הודעה</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <form id="msgForm" class="needs-validation" novalidate>
+                                    <div class="input-group has-validation">
+                                        <textarea id="textarea" class="form-control" style="height: 100px" maxlength="100" required></textarea>
+                                    </div>
+                                    <div id="charCount" class="form-text"></div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">סגור</button>
+                                        <button type="submit" class="btn btn-primary">שלח</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div><!-- End Vertically centered Modal-->
+            </div>
+        </div>
+    </main><!-- End #main -->
+    <!-- ======= Footer ======= -->
+    <footer id="footer" class="footer">
+        <div class="copyright">
+            &copy; Copyright <strong><span>LML</span></strong>. All Rights Reserved
+        </div>
+    </footer><!-- End Footer -->
+
+    <a href="#" class="back-to-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
+
+    <!-- Vendor JS Files -->
+    <script src="../assets/vendor/apexcharts/apexcharts.min.js"></script>
+    <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="../assets/vendor/chart.js/chart.umd.js"></script>
+    <script src="../assets/vendor/echarts/echarts.min.js"></script>
+    <script src="../assets/vendor/quill/quill.min.js"></script>
+    <script src="../assets/vendor/simple-datatables/simple-datatables.js"></script>
+    <script src="../assets/vendor/tinymce/tinymce.min.js"></script>
+    <script src="../assets/vendor/php-email-form/validate.js"></script>
+
+    <!-- Template Main JS File -->
+    <script src="../assets/js/main.js"></script>
+
+</body>
+
+</html>

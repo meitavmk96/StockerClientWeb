@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+
+<head>
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+
+    <title>Stocker - Manager-NormRequests</title>
+    <meta content="" name="description">
+    <meta content="" name="keywords">
+
+    <!-- Favicons -->
+    <link href="../assets/img/logo.png" rel="icon">
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.gstatic.com" rel="preconnect">
+    <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,300i,400,400i,600,600i,700,700i|Nunito:300,300i,400,400i,600,600i,700,700i|Poppins:300,300i,400,400i,500,500i,600,600i,700,700i" rel="stylesheet">
+
+    <!-- Vendor CSS Files -->
+    <link href="../assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="../assets/vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
+    <link href="../assets/vendor/boxicons/css/boxicons.min.css" rel="stylesheet">
+    <link href="../assets/vendor/quill/quill.snow.css" rel="stylesheet">
+    <link href="../assets/vendor/quill/quill.bubble.css" rel="stylesheet">
+    <link href="../assets/vendor/remixicon/remixicon.css" rel="stylesheet">
+    <link href="../assets/vendor/simple-datatables/style.css" rel="stylesheet">
+
+    <!-- Template Main CSS File -->
+    <link href="../assets/css/style.css" rel="stylesheet" />
+    <link href="../assets/css/ourStyle.css" rel="stylesheet" />
+
+
+    <!-- ajaxCalls and JQuery -->
+    <script src="../assets/js/ajaxCalls.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.1.min.js" integrity="sha256-o88AwQnZB+VDvE9tvIXrMQaPlFFSUTR+nldQm1LuPXQ=" crossorigin="anonymous"></script>
+    <script src="../assets/js/custom-dropdown-input.js"></script>
+    <script src="../assets/js/custom-dropdown-input-meds.js"></script>
+    <script src="../assets/js/global-functions.js"></script>
+    <script src="https://unpkg.com/sweetalert/dist/sweetalert.min.js"></script>
+
+    <!-- datatables -->
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.24/css/jquery.dataTables.min.css">
+    <script type="text/javascript" src="https://cdn.datatables.net/1.10.24/js/jquery.dataTables.min.js"></script>
+
+    <script>
+
+        $(document).ready(function () {
+
+            GetNormReqsApi = "https://proj.ruppin.ac.il/cgroup36/prod/api/NormRequest";
+
+            user = JSON.parse(sessionStorage.getItem("LoginUser")); //get user from storage
+            renderUser(user);
+
+            NormReqs = [];
+            GetNormReqs();
+
+            reqId = JSON.parse(sessionStorage.getItem("GOTO")); //get user from storage
+            if (reqId != null) {
+                var columnNames = ["reqId", "reqDate", "depName", "fullName", "position"];
+
+                var reqData = {};// Create an empty object to store the row data
+
+                var table = $('#Table').DataTable(); // החלף 'myTable' עם מזהה הטבלה שלך
+                var rows = table.rows().nodes();
+
+                for (var i = 0; i < rows.length; i++) {
+                    var row = rows[i];
+                    var reqID = table.cell(row, 0).data(); // החלף 1 עם מיקום העמודה של 'reqID'
+
+                    if (reqID == reqId) {
+                        // פעולות שברצונך לבצע על השורה
+                        $(row).find('td').each(function (index, cell) {// Loop through each cell in the clicked row
+                            reqData[columnNames[index]] = $(cell).text();// Get the cell value and add it to the reqData object
+                        });
+
+                        // Find the req in the NormReqs array based on the reqId
+                        var req = NormReqs.find(function (req) {
+                            return req.reqId === reqId;// Convert the reqId to an integer
+                        });
+
+                        // Add the medReqList to the reqData object
+                        reqData.medReqList = req.medReqList;
+                        // Add the depId to the reqData object
+                        reqData.depId = req.depId;
+
+                        var reqDataJson = JSON.stringify(reqData);// Convert the reqData object to a JSON string
+
+                        sessionStorage.setItem('NormRequest', reqDataJson);// Add the rowDataJson to the session storage
+
+                        window.location.href = 'Manager-NormRequest.html';// Navigate to NormRequest page
+
+                        sessionStorage.removeItem('GOTO');
+                    }
+                }
+            }
+
+
+            $('#Table').on('click', 'tbody tr', function () {// This function will be called when a row is clicked
+                // Create an array for the column names of the table
+                var columnNames = ["reqId", "reqDate", "depName", "fullName", "position"];
+
+                var reqData = {};// Create an empty object to store the row data
+
+                $(this).find('td').each(function (index, cell) {// Loop through each cell in the clicked row
+                    reqData[columnNames[index]] = $(cell).text();// Get the cell value and add it to the reqData object
+                });
+
+                // Find the req in the NormReqs array based on the reqId
+                var req = NormReqs.find(function (req) {
+                    return req.reqId === parseInt(reqData.reqId);// Convert the reqId to an integer
+                });
+
+                // Add the medReqList to the reqData object
+                reqData.medReqList = req.medReqList;
+                // Add the depId to the reqData object
+                reqData.depId = req.depId;
+
+                var reqDataJson = JSON.stringify(reqData);// Convert the reqData object to a JSON string
+
+                sessionStorage.setItem('NormRequest', reqDataJson);// Add the rowDataJson to the session storage
+
+                window.location.href = 'Manager-NormRequest.html';// Navigate to NormRequest page
+            });
+
+        })
+
+        function GetNormReqs() {
+            ajaxCall("GET", GetNormReqsApi, "", GetNormReqsSCB, GetNormReqsECB);
+            return false;
+        }
+
+        function GetNormReqsSCB(data) {
+            console.log("NormReqs:", data);
+            NormReqs = data;
+            DataTableRender(data);
+        }
+
+        function GetNormReqsECB(err) {
+            console.log(err);
+            sweetalert("שגיאה בשרת", "", true, false, "");
+        }
+
+        function DataTableRender(reqsData) {
+            let reqsArray = [];
+
+            for (var i = 0; i < reqsData.length; i++) {
+
+                var date = new Date(reqsData[i].reqDate); // המרה לתאריך
+                reqsData[i].reqDate = date.toISOString().slice(0, 10); //yyyy-mm-dd פורמט מבוקש
+                //reqsData[i].reqTime = reqsData[i].reqTime.slice(0, 5); //hh:mm פורמט מבוקש
+
+                reqsArray.push(reqsData[i]);
+            }
+            try {
+                tbl = $('#Table').DataTable({
+                    "language": {
+                        "url": "//cdn.datatables.net/plug-ins/9dcbecd42ad/i18n/Hebrew.json"
+                    },
+                    data: reqsArray,
+                    pageLength: 5,
+                    columns: [
+                        { data: "reqId" },
+                        { data: "reqDate" },
+                        //{ data: "reqTime" },
+                        { data: "depName" },
+                        { data: "fullName" },
+                        { data: "position" },
+                    ],
+                    order: [[1, "desc"]]
+                });
+            }
+
+            catch (err) {
+                alert(err);
+            }
+        }
+
+    </script>
+
+</head>
+
+<body>
+
+    <!-- ======= Header ======= -->
+    <header id="header" class="header fixed-top d-flex align-items-center">
+
+        <div class="d-flex align-items-center justify-content-between">
+            <a href="Manager-Dashboard.html" class="logo d-flex align-items-center">
+                <span class="d-none d-xl-block">St<img class="header-logo" src="../assets/img/logo.png" alt="">cker</span>
+            </a>
+            <i class="bi bi-list toggle-sidebar-btn"></i>
+        </div>
+
+        <nav class="profil-nav header-nav ms-auto">
+            <ul class="d-flex align-items-center">
+                <li class="nav-item dropdown">
+                    <a class="nav-link nav-icon" href="Manager-messages.html">
+                        <i class="bi bi-bell"></i>
+                    </a><!-- End Notification Icon -->
+                </li><!-- End Notification Nav -->
+
+                <li class="nav-item dropdown pe-3">
+                    <a class="nav-link nav-profile d-flex align-items-center pe-0" href="#" data-bs-toggle="dropdown" id="user_ph2">
+                        <span class="d-none d-md-block dropdown-toggle ps-2"></span>
+                    </a><!-- End Profile Iamge Icon -->
+
+                    <ul class="dropdown-menu dropdown-menu-end dropdown-menu profile">
+                        <li class="dropdown-header" id="user_ph1">
+                        </li>
+                        <li>
+                            <hr class="dropdown-divider">
+                        </li>
+                        <li>
+                            <a class="dropdown-item d-flex align-items-center" onclick="clearStorage()" href="Login.html">
+                                <i id="logoutIcon" class="bi bi-box-arrow-right"></i>
+                                <span>התנתק</span>
+                            </a>
+                        </li>
+                    </ul><!-- End Profile Dropdown Items -->
+                </li><!-- End Profile Nav -->
+
+            </ul>
+        </nav><!-- End Icons Navigation -->
+    </header><!-- End Header -->
+    <!-- ======= Sidebar ======= -->
+    <aside id="sidebar" class="sidebar">
+        <ul class="sidebar-nav" id="sidebar-nav">
+            <li class="nav-item">
+                <a class="nav-link collapsed" href="Manager-Dashboard.html">
+                    <span>בית</span>
+                </a>
+            </li>
+            <!-- End Home Nav -->
+            <li class="nav-item">
+                <a class="nav-link collapsed" data-bs-target="#orders-nav" data-bs-toggle="collapse" href="#" onclick="reload()">
+                    <span>הזמנות</span><i class="bi bi-chevron-down ms-auto"></i>
+                </a>
+                <ul id="orders-nav" class="nav-content collapse" data-bs-parent="#sidebar-nav">
+                    <li>
+                        <a href="Manager-PullOrders.html" onclick="reload()">
+                            <i class="bi bi-circle"></i><span>הזמנות משיכה</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="Manager-PushOrders.html" onclick="reload()">
+                            <i class="bi bi-circle"></i><span>הזמנות דחיפה</span>
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <!-- End Orders Nav -->
+            <li class="nav-item">
+                <a class="nav-link collapsed" data-bs-target="#departments-nav" data-bs-toggle="collapse" href="#" onclick="reload()">
+                    <span>מחלקות</span><i class="bi bi-chevron-down ms-auto"></i>
+                </a>
+                <ul id="departments-nav" class="nav-content collapse" data-bs-parent="#sidebar-nav">
+                    <li>
+                        <a href="Manager-DepsInventory.html" class="active" onclick="reload()">
+                            <i class="bi bi-circle"></i><span>מחסן המחלקות</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="Manager-DepsUsage.html" onclick="reload()">
+                            <i class="bi bi-circle"></i><span>צריכת המחלקות</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="Manager-DepsTransfers.html" onclick="reload()">
+                            <i class="bi bi-circle"></i><span>העברות בין מחלקות</span>
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <!-- End Deps Nav -->
+            <li class="nav-item">
+                <a class="nav-link active" data-bs-target="#norms-nav" data-bs-toggle="collapse" href="#" onclick="reload()">
+                    <span>תקנים</span><i class="bi bi-chevron-down ms-auto"></i>
+                </a>
+                <ul id="norms-nav" class="nav-content collapse show" data-bs-parent="#sidebar-nav">
+                    <li>
+                        <a href="Manager-DepsNorms.html" onclick="reload()">
+                            <i class="bi bi-circle"></i><span>תקן המחלקות</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="Manager-NormRequests.html" class="active" onclick="reload()">
+                            <i class="bi bi-circle"></i><span>בקשות לעדכון תקן</span>
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <!-- End Norms Nav -->
+        </ul>
+    </aside><!-- End Sidebar-->
+
+    <main id="main" class="main">
+        <div class="row">
+            <div class="col-10 pagetitle"><h1>בקשות לשינוי תקן</h1></div>
+            <div id="LastUpdate_ph" class="col-2"></div>
+        </div><!-- End Page Title -->
+        <div class="card">
+            <div class="card-body">
+                <!-- Table with stripped rows table-striped-->
+                <div class="table-responsive">
+                    <table class="table hover table-striped-custom hide-table-header" id="Table" style="width:100%">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>תאריך</th>
+                                <!--<th>שעה</th>-->
+                                <th>שם המחלקה</th>
+                                <th>יוצר הבקשה</th>
+                                <th>תפקיד</th>
+                            </tr>
+                        </thead>
+                    </table>
+                </div>
+                <!-- End Table with stripped rows -->
+                <div id="button_ph" class="d-flex justify-content-center"></div>
+            </div>
+        </div>
+    </main><!-- End #main -->
+    <!-- ======= Footer ======= -->
+    <footer id="footer" class="footer">
+        <div class="copyright">
+            &copy; Copyright <strong><span>LML</span></strong>. All Rights Reserved
+        </div>
+    </footer><!-- End Footer -->
+
+    <a href="#" class="back-to-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
+
+    <!-- Vendor JS Files -->
+    <script src="../assets/vendor/apexcharts/apexcharts.min.js"></script>
+    <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="../assets/vendor/chart.js/chart.umd.js"></script>
+    <script src="../assets/vendor/echarts/echarts.min.js"></script>
+    <script src="../assets/vendor/quill/quill.min.js"></script>
+    <script src="../assets/vendor/simple-datatables/simple-datatables.js"></script>
+    <script src="../assets/vendor/tinymce/tinymce.min.js"></script>
+    <script src="../assets/vendor/php-email-form/validate.js"></script>
+
+    <!-- Template Main JS File -->
+    <script src="../assets/js/main.js"></script>
+
+</body>
+
+</html>

@@ -1,0 +1,527 @@
+﻿<!DOCTYPE html>
+<html lang="he" dir="rtl">
+
+<head>
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+
+    <title>Stocker - Form</title>
+    <meta content="" name="description">
+    <meta content="" name="keywords">
+
+    <!-- Favicons -->
+    <link href="../assets/img/logo.png" rel="icon">
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.gstatic.com" rel="preconnect">
+    <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,300i,400,400i,600,600i,700,700i|Nunito:300,300i,400,400i,600,600i,700,700i|Poppins:300,300i,400,400i,500,500i,600,600i,700,700i" rel="stylesheet">
+
+    <!-- Vendor CSS Files -->
+    <link href="../assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="../assets/vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
+    <link href="../assets/vendor/boxicons/css/boxicons.min.css" rel="stylesheet">
+    <link href="../assets/vendor/quill/quill.snow.css" rel="stylesheet">
+    <link href="../assets/vendor/quill/quill.bubble.css" rel="stylesheet">
+    <link href="../assets/vendor/remixicon/remixicon.css" rel="stylesheet">
+    <link href="../assets/vendor/simple-datatables/style.css" rel="stylesheet">
+
+    <!-- Template Main CSS File -->
+    <link href="../assets/css/style.css" rel="stylesheet" />
+    <link href="../assets/css/ourStyle.css" rel="stylesheet" />
+
+    <!-- ajaxCalls and JQuery -->
+    <script src="../assets/js/ajaxCalls.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.1.min.js" integrity="sha256-o88AwQnZB+VDvE9tvIXrMQaPlFFSUTR+nldQm1LuPXQ=" crossorigin="anonymous"></script>
+    <script src="../assets/js/custom-dropdown-input.js"></script>
+    <script src="../assets/js/global-functions.js"></script>
+    <script src="https://unpkg.com/sweetalert/dist/sweetalert.min.js"></script>
+
+    <!-- datatable -->
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.24/css/jquery.dataTables.min.css">
+    <script type="text/javascript" src="https://cdn.datatables.net/1.10.24/js/jquery.dataTables.min.js"></script>
+
+    <script>
+
+        $(document).ready(function () {
+
+            apiDep = "https://proj.ruppin.ac.il/cgroup36/prod/api/Department";
+            apiUser = "https://proj.ruppin.ac.il/cgroup36/prod/api/User";
+
+            user = JSON.parse(sessionStorage.getItem("LoginUser")); //get user from storage
+            renderUser(user);
+
+            userId = JSON.parse(sessionStorage.getItem("Id")); //get UserID from storage
+            TitleRender();
+
+            if (userId != null)
+                GetUser();
+
+            deps = [];
+            depNames = [];
+            GetDepartments();
+            createDropDownInput(depNames);
+
+
+            $("#UserForm").submit(function () {
+                var item = sessionStorage.getItem('Id');
+                if (item !== null)
+                    updateUserInServer();
+                else
+                    postUserToServer();
+                return false;
+            });
+
+        });
+
+        function TitleRender() {
+            let titleStr = `<h1>טופס משתמש</h1>`;
+            titleStr += `<nav>`;
+            titleStr += `<ol class="breadcrumb">`;
+            if (userId != null)
+                titleStr += `<li class="breadcrumb-item">משתמש מספר ${userId}</li>`;
+            else
+                titleStr += `<li class="breadcrumb-item">יצירת משתמש חדש</li>`;
+            titleStr += `<li class="breadcrumb-item active"><a href="Admin-Users.html">משתמשים</a></li>`;
+            titleStr += `</ol>`;
+            titleStr += `</nav>`;
+            document.getElementById("title_ph").innerHTML = titleStr;
+        }
+
+
+        function GetUser() {
+            ajaxCall("GET", apiUser + "/GetUsers", "", successGetUserCBF, errorGetUserCBF);
+        }
+
+        function successGetUserCBF(data) {
+            console.log(data);
+            if (data != null) {
+                for (var i = 0; i < data.length; i++) {
+                    if (data[i]['userId'] == userId)
+                        renderUserDetails(data[i]);
+                }
+            }
+            else {
+                sweetalert("שגיאה בשרת", "", true, false, "");
+            }
+        }
+
+        function errorGetUserCBF(err) {
+            console.log(err);
+            sweetalert("שגיאה בשרת", "", true, false, "");
+        }
+
+        function renderUserDetails(user) {
+            $("#usernameTB").val(user.username);
+            $("#firstNameTB").val(user.firstName);
+            $("#lastNameTB").val(user.lastName);
+            $("#emailTB").val(user.email);
+            $("#emailPTB").val(user.emailP);
+            $("#passwordTB").val(user.password);
+            $("#phoneTB").val(user.phone);
+            $("#positionTB").val(user.position);
+            $("#jobTypeTB").val(user.jobType);
+            $("#input").val(user.depName);
+            $("#isActiveCB").prop('checked', user.isActive);
+        }
+
+
+        function GetDepartments() {
+            ajaxCall("GET", apiDep, "", successGetDepsCBF, errorGetDepsCBF);
+        }
+
+        function successGetDepsCBF(data) {
+            console.log(data);
+
+            for (var i = 0; i < data.length; i++) {
+                if (data[i]['depName'] != "") {
+                    depNames.push(data[i]['depName']);
+                    deps.push(data[i]);
+                }
+            }
+            renderOptions(depNames);
+        }
+
+        function errorGetDepsCBF(err) {
+            console.log(err);
+            sweetalert("שגיאה בשרת", "", true, false, "");
+        }
+
+
+        function postUserToServer() { //post to server
+            const username = $("#usernameTB").val();
+            const firstName = $("#firstNameTB").val();
+            const lastName = $("#lastNameTB").val();
+            const email = $("#emailTB").val();
+            const emailP = $("#emailPTB").val();
+            const password = $("#passwordTB").val();
+            const phone = $("#phoneTB").val().replace(/[^\d]/g, '');
+            const position = $("#positionTB").val();
+            const jobType = $("#jobTypeTB").val();
+            var depName = $("#input").val();
+            const isActive = $("#isActiveCB").is(":checked");
+
+
+            if (username == "" || firstName == "" || lastName == "" || username == "" || email == "" || emailP == "" || password == "" || phone == "" || jobType == "" || depName == "")
+                return;
+            else {
+
+                var depId = 0;
+                for (var i = 0; i < deps.length; i++) {
+                    if (deps[i]['depName'] == depName)
+                        depId = deps[i]['depId'];
+                }
+
+                const user = {
+                    UserId: 0,
+                    Username: username,
+                    FirstName: firstName,
+                    LastName: lastName,
+                    Email: email,
+                    EmailP: emailP,
+                    Password: password,
+                    Phone: phone,
+                    Position: position,
+                    JobType: jobType,
+                    DepId: depId,
+                    IsActive: isActive
+                };
+
+                sessionStorage.setItem("newUser", JSON.stringify(user));
+
+                ajaxCall("POST", apiUser, JSON.stringify(user), successPostUCBF, errorPostUCBF);
+
+                return false;
+            }
+        }
+
+        function successPostUCBF(data) {
+            console.log(data);
+
+            if (data == 1) {
+                sessionStorage.removeItem('Id');
+                newUser = JSON.parse(sessionStorage.getItem("newUser"));
+                ajaxCall("POST", apiUser + '/Email', JSON.stringify(newUser), successPostECBF, errorPostECBF);
+                sweetalert("המשתמש התווסף בהצלחה", "", false, true, 'Admin-Users.html');
+            }
+            else {
+                if (data == -1) {
+                    sweetalert("שגיאה", "משתמש זה כבר קיים במערכת, אנא בחר שם משתמש אחר", true, false, "");
+                }
+                else
+                    sweetalert("שגיאה בשרת", "", true, false, "");
+            }
+        }
+
+        function successPostECBF(data) {
+            sessionStorage.removeItem('newUser');
+        }
+
+        function errorPostECBF(err) {
+            console.log(err);
+            sweetalert("שגיאה בשרת", "", true, false, "");
+        }
+
+        function errorPostUCBF(err) {
+            console.log(err);
+            sweetalert("שגיאה בשרת", "", true, false, "");
+        }
+
+
+        function updateUserInServer() {
+            const username = $("#usernameTB").val();
+            const firstName = $("#firstNameTB").val();
+            const lastName = $("#lastNameTB").val();
+            const email = $("#emailTB").val();
+            const emailP = $("#emailPTB").val();
+            const password = $("#passwordTB").val();
+            const phone = $("#phoneTB").val().replace(/[^\d]/g, '');
+            const position = $("#positionTB").val();
+            const jobType = $("#jobTypeTB").val();
+            var depName = $("#input").val();
+            const isActive = $("#isActiveCB").is(":checked");
+
+
+            if (username == "" || firstName == "" || lastName == "" || username == "" || email == "" || emailP == "" || password == "" || phone == "" || jobType == "" || depName == "")
+                return;
+            else {
+
+                var depId = 0;
+                for (var i = 0; i < deps.length; i++) {
+                    if (deps[i]['depName'] == depName)
+                        depId = deps[i]['depId'];
+                }
+
+                const user = {
+                    UserId: userId,
+                    Username: username,
+                    FirstName: firstName,
+                    LastName: lastName,
+                    Email: email,
+                    EmailP: emailP,
+                    Password: password,
+                    Phone: phone,
+                    Position: position,
+                    JobType: jobType,
+                    DepId: depId,
+                    IsActive: isActive
+                };
+
+                ajaxCall("PUT", apiUser + "/" + userId, JSON.stringify(user), successPutUCBF, errorPutUCBF);
+                return false;
+            }
+        }
+
+        function successPutUCBF(data) {
+            console.log(data);
+
+            if (data == true) {
+                sessionStorage.removeItem('Id');
+                sweetalert("העדכון בוצע בהצלחה", "", false, true, 'Admin-Users.html');
+            }
+            else
+                sweetalert("שגיאה בשרת", "", true, false, "");
+        }
+
+        function errorPutUCBF(err) {
+            console.log(err);
+            sweetalert("שגיאה בשרת", "", true, false, "");
+        }
+
+    </script>
+</head>
+
+<body>
+
+    <!-- ======= Header ======= -->
+    <header id="header" class="header fixed-top d-flex align-items-center">
+
+        <div class="d-flex align-items-center justify-content-between">
+            <a href="Manager-Dashboard.html" class="logo d-flex align-items-center" onclick="reload()">
+                <span class="d-none d-xl-block">St<img class="header-logo" src="../assets/img/logo.png" alt="">cker</span>
+            </a>
+            <i class="bi bi-list toggle-sidebar-btn"></i>
+        </div>
+
+        <nav class="profil-nav header-nav ms-auto">
+            <ul class="d-flex align-items-center">
+                <li class="nav-item dropdown pe-3">
+                    <a class="nav-link nav-profile d-flex align-items-center pe-0" href="#" data-bs-toggle="dropdown" id="user_ph2">
+                        <span class="d-none d-md-block dropdown-toggle ps-2"></span>
+                    </a><!-- End Profile Image Icon -->
+
+                    <ul class="dropdown-menu dropdown-menu-end dropdown-menu profile">
+                        <li class="dropdown-header" id="user_ph1">
+                        </li>
+                        <li>
+                            <hr class="dropdown-divider">
+                        </li>
+                        <li>
+                            <a class="dropdown-item d-flex align-items-center" onclick="clearStorage()" href="Login.html">
+                                <i id="logoutIcon" class="bi bi-box-arrow-right"></i>
+                                <span>התנתק</span>
+                            </a>
+                        </li>
+                    </ul><!-- End Profile Dropdown Items -->
+                </li><!-- End Profile Nav -->
+
+            </ul>
+        </nav><!-- End Icons Navigation -->
+    </header><!-- End Header -->
+    <!-- ======= Sidebar ======= -->
+    <aside id="sidebar" class="sidebar">
+        <ul class="sidebar-nav" id="sidebar-nav">
+
+            <li class="nav-item">
+                <a class="nav-link collapsed" data-bs-target="#departments-nav" data-bs-toggle="collapse" href="#" onclick="reload()">
+                    <span>מחלקות</span><i class="bi bi-chevron-down ms-auto"></i>
+                </a>
+                <ul id="departments-nav" class="nav-content collapse" data-bs-parent="#sidebar-nav">
+                    <li>
+                        <a href="Admin-Departments.html" onclick="reload()">
+                            <i class="bi bi-circle"></i><span>צפייה במחלקות</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="Admin-DepForm.html" onclick="reload()">
+                            <i class="bi bi-circle"></i><span>טופס מחלקה</span>
+                        </a>
+                    </li>
+                </ul>
+            </li><!-- End Departments Nav -->
+
+            <li class="nav-item">
+                <a class="nav-link active" data-bs-target="#users-nav" data-bs-toggle="collapse" href="#" onclick="reload()">
+                    <span>משתמשים</span>
+                    <i class="bi bi-chevron-down ms-auto"></i>
+                </a>
+                <ul id="users-nav" class="nav-content collapse show" data-bs-parent="#sidebar-nav">
+                    <li>
+                        <a href="Admin-Users.html" onclick="reload()">
+                            <i class="bi bi-circle"></i><span>צפייה במשתמשים</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="Admin-UserForm.html" class="active" onclick="reload()">
+                            <i class="bi bi-circle"></i><span>טופס משתמש</span>
+                        </a>
+                    </li>
+                </ul>
+            </li><!-- End Users Nav -->
+
+            <li class="nav-item">
+                <a class="nav-link collapsed" data-bs-target="#meds-nav" data-bs-toggle="collapse" href="#" onclick="reload()">
+                    <span>תרופות</span>
+                    <i class="bi bi-chevron-down ms-auto"></i>
+                </a>
+                <ul id="meds-nav" class="nav-content collapse" data-bs-parent="#sidebar-nav">
+                    <li>
+                        <a href="Admin-Medicines.html" onclick="reload()">
+                            <i class="bi bi-circle"></i><span>צפייה בתרופות</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="Admin-MedForm.html" onclick="reload()">
+                            <i class="bi bi-circle"></i><span>טופס תרופה</span>
+                        </a>
+                    </li>
+                </ul>
+            </li><!-- End Mediciens Nav -->
+
+
+        </ul><!-- End Nav -->
+    </aside><!-- End Sidebar-->
+    <!-- ======= Main ======= -->
+    <main id="main" class="main">
+        <div id="title_ph" class="pagetitle"></div>
+        <!-- End Page Title -->
+        <section class="section">
+            <div class="row">
+                <div class="card">
+                    <div class="card-body">
+                        <br />
+                        <!-- Form -->
+                        <form id="UserForm" class="row g-3 needs-validation" novalidate>
+
+                            <div class="col-md-5">
+                                <label for="firstNameTB" class="form-label">שם פרטי <i class="bi bi-asterisk"></i></label>
+                                <div class="col input-group has-validation">
+                                    <input type="text" class="form-control" id="firstNameTB" maxlength="20" required>
+                                    <div class="invalid-feedback">הכנס שם פרטי המכיל עד 20 תווים</div>
+                                </div>
+                            </div>
+                            <div class="col-md-5">
+                                <label for="lastNameTB" class="form-label">שם משפחה <i class="bi bi-asterisk"></i></label>
+                                <div class="col input-group has-validation">
+                                    <input type="text" class="form-control" id="lastNameTB" maxlength="20" required>
+                                    <div class="invalid-feedback">הכנס שם משפחה המכיל עד 20 תווים</div>
+                                </div>
+                            </div>
+                            <div class="col-md-5">
+                                <label for="usernameTB" class="form-label">שם משתמש <i class="bi bi-asterisk"></i></label>
+                                <div class="input-group has-validation">
+                                    <input type="text" class="form-control" id="usernameTB" aria-describedby="inputGroupPrepend" maxlength="30" required>
+                                    <div class="invalid-feedback">הכנס שם משתמש המכיל עד 30 תווים</div>
+                                </div>
+                            </div>
+                            <div class="col-md-5">
+                                <label for="passwordTB" class="form-label">סיסמה <i class="bi bi-asterisk"></i></label>
+                                <div class="col input-group has-validation">
+                                    <input type="text" class="form-control" id="passwordTB" length="6" required>
+                                    <div class="invalid-feedback">הכנס סיסמה בעלת 6 תווים</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="input" class="form-label">שם המחלקה <i class="bi bi-asterisk"></i></label>
+                                <div class="custom-dropdown input-group has-validation">
+                                    <div class="not-preceded-by-td">
+                                        <input type="text" id="input" class="form-control" autocomplete="off" required>
+                                        <ul class="dropdown-options" id="dropdown-options"></ul>
+                                        <div class="invalid-feedback">אנא בחר את שם המחלקה מתוך הרשימה</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="jobTypeTB" class="form-label">סוג משתמש <i class="bi bi-asterisk"></i></label>
+                                <div class="col input-group has-validation">
+                                    <select id="jobTypeTB" class="form-select form-control" autocomplete="off" required>
+                                        <option value=""></option>
+                                        <option value="A">אדמין</option>
+                                        <option value="N">אח/ות</option>
+                                        <option value="P">רוקח/ת</option>
+                                        <option value="M">מנהל/ת בית מרקחת</option>
+                                    </select>
+                                    <div class="valid-feedback">אנא בחר את סוג המשתמש מתוך הרשימה</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="emailTB" class="form-label">דוא"ל <i class="bi bi-asterisk"></i></label>
+                                <div class="col input-group has-validation">
+                                    <input type="email" class="form-control" id="emailTB" style="direction: ltr" placeholder="@hymc.gov.il" maxlength="50" required>
+                                    <div class="invalid-feedback">הכנס דואר אלקטרוני בפורמט המתאים עד 50 תווים</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="phoneTB" class="form-label">נייד <i class="bi bi-asterisk"></i></label>
+                                <div class="col input-group has-validation">
+                                    <input name="phone" type="text" class="form-control" id="phoneTB" pattern="^05\d([-]{0,1})\d{7}$" required>
+                                    <div class="invalid-feedback">מספר נייד צריך להיות בעל 10 ספרות</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="emailPTB" class="form-label">דוא"ל פרטי <i class="bi bi-asterisk"></i></label>
+                                <div class="col input-group has-validation">
+                                    <input type="email" class="form-control" id="emailPTB" style="direction: ltr" placeholder="@gmail.com" maxlength="50" required> 
+                                    <div class="invalid-feedback">הכנס דואר אלקטרוני בפורמט המתאים עד 50 תווים</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="positionTB" class="form-label">תפקיד</label>
+                                <div class="col input-group">
+                                    <input type="text" class="form-control" id="positionTB">
+                                </div>
+                            </div>
+                            <br />
+                            <div class="col-12">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="isActiveCB" checked>
+                                    <label class="form-check-label" for="gridCheck">משתמש פעיל</label>
+                                </div>
+                            </div>
+                            <br />
+                            <div class="text-center">
+                                <button type="submit" class="btn btn-primary">שלח</button>
+                                <button type="reset" class="btn btn-secondary" onclick="reload()">נקה</button>
+                            </div>
+                            <br />
+                        </form><!-- End Custom Styled Validation -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main><!-- End #main -->
+    <!-- ======= Footer ======= -->
+    <footer id="footer" class="footer">
+        <div class="copyright">
+            &copy; Copyright <strong><span>LML</span></strong>. All Rights Reserved
+        </div>
+    </footer> <!--End Footer-->
+
+    <a href="#" class="back-to-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
+
+    <!-- Vendor JS Files -->
+    <script src="../assets/vendor/apexcharts/apexcharts.min.js"></script>
+    <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="../assets/vendor/chart.js/chart.umd.js"></script>
+    <script src="../assets/vendor/echarts/echarts.min.js"></script>
+    <script src="../assets/vendor/quill/quill.min.js"></script>
+    <script src="../assets/vendor/tinymce/tinymce.min.js"></script>
+    <script src="../assets/vendor/php-email-form/validate.js"></script>
+
+    <!-- Template Main JS File -->
+    <script src="../assets/js/main.js"></script>
+
+
+</body>
+
+</html>

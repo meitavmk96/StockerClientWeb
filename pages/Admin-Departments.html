@@ -1,0 +1,262 @@
+﻿<!DOCTYPE html>
+<html lang="he" dir="rtl">
+
+<head>
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+
+    <title>Stocker - Admin</title>
+    <meta content="" name="description">
+    <meta content="" name="keywords">
+
+    <!-- Favicons -->
+    <link href="../assets/img/logo.png" rel="icon">
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.gstatic.com" rel="preconnect">
+    <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,300i,400,400i,600,600i,700,700i|Nunito:300,300i,400,400i,600,600i,700,700i|Poppins:300,300i,400,400i,500,500i,600,600i,700,700i" rel="stylesheet">
+
+    <!-- Vendor CSS Files -->
+    <link href="../assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="../assets/vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
+    <link href="../assets/vendor/boxicons/css/boxicons.min.css" rel="stylesheet">
+    <link href="../assets/vendor/quill/quill.snow.css" rel="stylesheet">
+    <link href="../assets/vendor/quill/quill.bubble.css" rel="stylesheet">
+    <link href="../assets/vendor/remixicon/remixicon.css" rel="stylesheet">
+    <link href="../assets/vendor/simple-datatables/style.css" rel="stylesheet">
+
+    <!-- Template Main CSS File -->
+    <link href="../assets/css/style.css" rel="stylesheet" />
+    <link href="../assets/css/ourStyle.css" rel="stylesheet" />
+
+    <!-- ajaxCalls and JQuery -->
+    <script src="../assets/js/ajaxCalls.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.1.min.js" integrity="sha256-o88AwQnZB+VDvE9tvIXrMQaPlFFSUTR+nldQm1LuPXQ=" crossorigin="anonymous"></script>
+    <script src="../assets/js/global-functions.js"></script>
+    <script src="https://unpkg.com/sweetalert/dist/sweetalert.min.js"></script>
+
+    <!-- datatable -->
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.24/css/jquery.dataTables.min.css">
+    <script type="text/javascript" src="https://cdn.datatables.net/1.10.24/js/jquery.dataTables.min.js"></script>
+
+    <script>
+
+        $(document).ready(function () {
+
+            api = "https://proj.ruppin.ac.il/cgroup36/prod/api/Department";
+
+            user = JSON.parse(sessionStorage.getItem("LoginUser")); //get user from storage
+            renderUser(user);
+
+            deps = [];
+            GetDepartments();
+
+            $('#Table').on('click', 'tbody tr', function () {// This function will be called when a row is clicked
+                var depStr = $(this).find('td:first').text();
+                var depId = parseInt(depStr);
+                sessionStorage.setItem('Id', depId);
+                window.location.href = 'Admin-DepForm.html';
+            });
+        })
+
+
+        function GetDepartments() {
+            ajaxCall("GET", api, "", successGetDepsCBF, errorGetDepsCBF);
+        }
+
+        function successGetDepsCBF(data) {
+            console.log(data);
+
+            for (var i = 0; i < data.length; i++) {
+                if (data[i]['depId'] != 0)
+                    deps.push(data[i]);
+            }
+
+            try {
+                tbl = $('#Table').DataTable({
+                    "language": { "url": "//cdn.datatables.net/plug-ins/9dcbecd42ad/i18n/Hebrew.json" },
+                    data: deps,
+                    pageLength: 5,
+                    columns: [
+                        { data: "depId" },
+                        { data: "depName" },
+                        { data: "depPhone" },
+                        { data: "depType" }
+                    ]
+                });
+            }
+            catch (err) {
+                console.log(err);
+                sweetalert("שגיאה בשרת", "", true, false, "");
+            }
+        }
+
+        function errorGetDepsCBF(err) {
+            console.log(err);
+            sweetalert("שגיאה בשרת", "", true, false, "");
+        }
+
+    </script>
+
+</head>
+
+<body>
+
+    <!-- ======= Header ======= -->
+    <header id="header" class="header fixed-top d-flex align-items-center">
+
+        <div class="d-flex align-items-center justify-content-between">
+            <a href="Admin-Departments.html" class="logo d-flex align-items-center">
+                <span class="d-none d-xl-block">St<img class="header-logo" src="../assets/img/logo.png" alt="">cker</span>
+            </a>
+            <i class="bi bi-list toggle-sidebar-btn"></i>
+        </div>
+
+        <nav class="profil-nav header-nav ms-auto">
+            <ul class="d-flex align-items-center">
+                <li class="nav-item dropdown pe-3">
+                    <a class="nav-link nav-profile d-flex align-items-center pe-0" href="#" data-bs-toggle="dropdown" id="user_ph2">
+                        <span class="d-none d-md-block dropdown-toggle ps-2"></span>
+
+                    </a><!-- End Profile Iamge Icon -->
+
+                    <ul class="dropdown-menu dropdown-menu-end dropdown-menu profile">
+                        <li class="dropdown-header" id="user_ph1"></li>
+                        <li>
+                            <hr class="dropdown-divider">
+                        </li>
+                        <li>
+                            <a class="dropdown-item d-flex align-items-center" onclick="clearStorage()" href="Login.html">
+                                <i id="logoutIcon" class="bi bi-box-arrow-right"></i>
+                                <span>התנתק</span>
+                            </a>
+                        </li>
+                    </ul><!-- End Profile Dropdown Items -->
+                </li><!-- End Profile Nav -->
+
+            </ul>
+        </nav><!-- End Icons Navigation -->
+    </header><!-- End Header -->
+   
+    <!-- ======= Sidebar ======= -->
+    <aside id="sidebar" class="sidebar">
+        <ul class="sidebar-nav" id="sidebar-nav">
+
+            <li class="nav-item">
+                <a class="nav-link active" data-bs-target="#departments-nav" data-bs-toggle="collapse" href="#">
+                    <span>מחלקות</span><i class="bi bi-chevron-down ms-auto"></i>
+                </a>
+                <ul id="departments-nav" class="nav-content collapse show" data-bs-parent="#sidebar-nav">
+                    <li>
+                        <a href="Admin-Departments.html" class="active">
+                            <i class="bi bi-circle"></i><span>צפייה במחלקות</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="Admin-DepForm.html">
+                            <i class="bi bi-circle"></i><span>טופס מחלקה</span>
+                        </a>
+                    </li>
+                </ul>
+            </li><!-- End Departments Nav -->
+
+            <li class="nav-item">
+                <a class="nav-link collapsed" data-bs-target="#users-nav" data-bs-toggle="collapse" href="#">
+                    <span>משתמשים</span>
+                    <i class="bi bi-chevron-down ms-auto"></i>
+                </a>
+                <ul id="users-nav" class="nav-content collapse " data-bs-parent="#sidebar-nav">
+                    <li>
+                        <a href="Admin-Users.html">
+                            <i class="bi bi-circle"></i><span>צפייה במשתמשים</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="Admin-UserForm.html">
+                            <i class="bi bi-circle"></i><span>טופס משתמש</span>
+                        </a>
+                    </li>
+                </ul>
+            </li><!-- End Users Nav -->
+
+            <li class="nav-item">
+                <a class="nav-link collapsed" data-bs-target="#meds-nav" data-bs-toggle="collapse" href="#">
+                    <span>תרופות</span>
+                    <i class="bi bi-chevron-down ms-auto"></i>
+                </a>
+                <ul id="meds-nav" class="nav-content collapse" data-bs-parent="#sidebar-nav">
+                    <li>
+                        <a href="Admin-Medicines.html">
+                            <i class="bi bi-circle"></i><span>צפייה בתרופות</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="Admin-MedForm.html">
+                            <i class="bi bi-circle"></i><span>טופס תרופה</span>
+                        </a>
+                    </li>
+                </ul>
+            </li><!-- End Mediciens Nav -->
+
+        </ul><!-- End Nav -->
+    </aside><!-- End Sidebar-->
+
+    <!-- ======= Main ======= -->
+    <main id="main" class="main">
+        <div class="pagetitle">
+            <h1>מחלקות</h1>
+        </div><!-- End Page Title -->
+
+        <section class="section">
+            <div class="row">
+                <div class="col-lg-12">
+
+                    <div class="card">
+                        <div class="card-body">
+                            <br />
+                            <!-- Table with stripped rows table-striped-->
+                            <table class="table hover table-striped-custom " id="Table" style="width:100%">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>שם מחלקה</th>
+                                        <th>טלפון</th>
+                                        <th>סוג מחלקה</th>
+                                    </tr>
+                                </thead>
+                            </table>
+                            <!-- End Table with stripped rows -->
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main><!-- End #main -->
+  
+    <!-- ======= Footer ======= -->
+    <footer id="footer" class="footer">
+        <div class="copyright">
+            &copy; Copyright <strong><span>LML</span></strong>. All Rights Reserved
+        </div>
+    </footer> <!--End Footer-->
+
+    <a href="#" class="back-to-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
+
+    <!-- Vendor JS Files -->
+    <script src="../assets/vendor/apexcharts/apexcharts.min.js"></script>
+    <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="../assets/vendor/chart.js/chart.umd.js"></script>
+    <script src="../assets/vendor/echarts/echarts.min.js"></script>
+    <script src="../assets/vendor/quill/quill.min.js"></script>
+    <script src="../assets/vendor/tinymce/tinymce.min.js"></script>
+    <script src="../assets/vendor/php-email-form/validate.js"></script>
+
+    <!-- Template Main JS File -->
+    <script src="../assets/js/main.js"></script>
+
+
+</body>
+
+</html>
